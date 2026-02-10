@@ -1,25 +1,32 @@
+import sys
+import os
+
+# Add src folder to path FIRST
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-from src.risk_score import calculate_risk, calculate_confidence
+from risk_score import calculate_risk, calculate_confidence
 
-# Create app ONLY ONCE
+
+# Create FastAPI app
 app = FastAPI(title="Smart Ambulance AI Service")
 
-# CORS middleware (for frontend UI)
+# Enable CORS (for UI)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow all (development only)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load trained model
-MODEL_PATH = "models/anomaly_model.joblib"
+# Load trained ML model
+MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'anomaly_model.joblib'))
 model = joblib.load(MODEL_PATH)
 
 
