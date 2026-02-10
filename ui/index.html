@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Ambulance AI</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .card {
+            background: #1e2a38;
+            padding: 25px;
+            border-radius: 10px;
+            width: 380px;
+            margin: auto;
+            box-shadow: 0px 5px 15px rgba(0,0,0,0.4);
+        }
+
+        input {
+            width: 90%;
+            padding: 8px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: none;
+        }
+
+        button {
+            background: #00c6ff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        canvas {
+            margin-top: 30px;
+            background: #0e1a25;
+            border-radius: 10px;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Smart Ambulance AI Dashboard</h1>
+
+<div class="card">
+    <input id="hr" placeholder="Heart Rate">
+    <input id="spo2" placeholder="SpO2">
+    <input id="bp_sys" placeholder="BP Systolic">
+    <input id="bp_dia" placeholder="BP Diastolic">
+    <input id="motion" placeholder="Motion Level">
+
+    <button onclick="predict()">Predict</button>
+    <button onclick="simulateVitals()">Simulate Patient</button>
+
+    <div id="result"></div>
+</div>
+
+<canvas id="vitalsChart" width="600" height="280"></canvas>
+
+<!-- Hidden Audio Element -->
+<audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+
+<script>
+let hrData = [];
+let spo2Data = [];
+let labels = [];
+
+const ctx = document.getElementById('vitalsChart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: 'Heart Rate', borderColor: '#ff4d4d', data: hrData, tension: 0.3 },
+            { label: 'SpO₂', borderColor: '#00c6ff', data: spo2Data, tension: 0.3 }
+        ]
+    },
+    options: {
+        scales: {
+            y: { min: 70, max: 180 }
+        }
+    }
+});
+
+function playAlarm() {
+    const audio = document.getElementById("alarmSound");
+    audio.play().catch(e => console.log("Sound blocked:", e));
+}
+
+function simulateVitals() {
+    document.getElementById("hr").value = Math.floor(Math.random() * 60) + 80;
+    document.getElementById("spo2").value = Math.floor(Math.random() * 10) + 90;
+    document.getElementById("bp_sys").value = Math.floor(Math.random() * 40) + 110;
+    document.getElementById("bp_dia").value = Math.floor(Math.random() * 30) + 70;
+    document.getElementById("motion").value = (Math.random()).toFixed(2);
+}
+
+async function predict() {
+    const data = {
+        hr: parseFloat(document.getElementById("hr").value),
+        spo2: parseFloat(document.getElementById("spo2").value),
+        bp_sys: parseFloat(document.getElementById("bp_sys").value),
+        bp_dia: parseFloat(document.getElementById("bp_dia").value),
+        motion: parseFloat(document.getElementById("motion").value)
+    };
+
+    const response = await fetch("http://127.0.0.1:8000/predict", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    let riskText = "LOW";
+    let color = "#00ff99";
+
+    if (result.risk_score > 70) {
+        riskText = "CRITICAL";
+        color = "#ff4d4d";
+        playAlarm();
+    } else if (result.risk_score > 40) {
+        riskText = "MODERATE";
+        color = "#ffaa00";
+    }
+
+    let message = "Patient stable.";
+    if (riskText === "CRITICAL") message = "Immediate medical attention required!";
+    else if (riskText === "MODERATE") message = "Monitor patient closely.";
+
+    document.getElementById("result").innerHTML = `
+        <p>Anomaly: <b>${result.anomaly}</b></p>
+        <p>Risk Score: <b>${result.risk_score}</b></p>
+        <p style="color:${color}; font-weight:bold;">Risk Level: ${riskText}</p>
+        <p>Confidence: <b>${result.confidence}</b></p>
+        <p>${message}</p>
+    `;
+
+    labels.push('');
+    hrData.push(data.hr);
+    spo2Data.push(data.spo2);
+
+    if (labels.length > 10) {
+        labels.shift();
+        hrData.shift();
+        spo2Data.shift();
+    }
+
+    chart.update();
+}
+</script>
+
+</body>
+</html>
